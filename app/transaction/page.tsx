@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Sun, Moon } from "lucide-react"
+import { ArrowLeft, Sun, Moon, Check, RotateCcw } from "lucide-react"
 
 interface TransactionStep {
   id: number
@@ -20,6 +20,140 @@ export default function TransactionJourney() {
   const router = useRouter()
   const [language, setLanguage] = useState<"ko" | "en">("ko")
   const [isDark, setIsDark] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Step 1 states
+  const [step1Amount, setStep1Amount] = useState("")
+  const [step1Signature, setStep1Signature] = useState(false)
+  const [step1Completed, setStep1Completed] = useState(false)
+  const [step1ShowStamp, setStep1ShowStamp] = useState(false)
+  const [isDrawing, setIsDrawing] = useState(false)
+
+  // Add stamp animation styles
+  useEffect(() => {
+    if (typeof document !== "undefined" && !document.getElementById("stamp-animation-styles")) {
+      const style = document.createElement("style")
+      style.id = "stamp-animation-styles"
+      style.textContent = `
+        @keyframes stampDrop {
+          0% {
+            transform: translateY(-80px) rotate(-15deg) scale(0.3);
+            opacity: 0;
+          }
+          70% {
+            transform: translateY(0) rotate(5deg) scale(1.05);
+            opacity: 1;
+          }
+          85% {
+            transform: translateY(0) rotate(-2deg) scale(0.98);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(0) rotate(0deg) scale(1);
+            opacity: 1;
+          }
+        }
+        
+        .stamp-animation {
+          animation: stampDrop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (canvas) {
+      canvas.width = 280
+      canvas.height = 80
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.fillStyle = isDark ? "#111827" : "#ffffff"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+  }, [isDark])
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    setIsDrawing(true)
+    const ctx = canvas.getContext("2d")
+    if (ctx) {
+      const rect = canvas.getBoundingClientRect()
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      ctx.beginPath()
+      ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY)
+      ctx.lineWidth = 2
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+      ctx.strokeStyle = isDark ? "#d1d5db" : "#1f2937"
+    }
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (ctx) {
+      const rect = canvas.getBoundingClientRect()
+      const scaleX = canvas.width / rect.width
+      const scaleY = canvas.height / rect.height
+      ctx.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY)
+      ctx.stroke()
+    }
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+    const canvas = canvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.closePath()
+        // Check if canvas has drawing (not empty)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+        let hasDrawing = false
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] > 128) {
+            hasDrawing = true
+            break
+          }
+        }
+        if (hasDrawing) {
+          setStep1Signature(true)
+        }
+      }
+    }
+  }
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.fillStyle = isDark ? "#111827" : "#ffffff"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        setStep1Signature(false)
+      }
+    }
+  }
+
+  const handleStep1Submit = () => {
+    if (step1Amount && step1Signature) {
+      setStep1ShowStamp(true)
+      setTimeout(() => {
+        setStep1ShowStamp(false)
+        setStep1Completed(true)
+        setCurrentStep(2)
+      }, 3000)
+    }
+  }
 
   const transactionSteps: TransactionStep[] = [
     {
@@ -116,6 +250,23 @@ export default function TransactionJourney() {
             </button>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => {
+                  setCurrentStep(1)
+                  setStep1Completed(false)
+                  setStep1ShowStamp(false)
+                  setStep1Amount("")
+                  setStep1Signature(false)
+                  clearSignature()
+                }}
+                className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
+                  isDark 
+                    ? "border-gray-600 text-gray-400 hover:text-gray-200" 
+                    : "border-gray-300 text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {language === "ko" ? "다시 시작" : "Restart"}
+              </button>
+              <button
                 onClick={() => setLanguage(language === "ko" ? "en" : "ko")}
                 className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
                   isDark 
@@ -139,6 +290,57 @@ export default function TransactionJourney() {
           </div>
         </div>
       </header>
+
+      {/* Progress Bar */}
+      <div className={`${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"} border-b sticky top-12 z-40`}>
+        <div className="container mx-auto px-4 py-4 max-w-6xl">
+          {/* Step Numbers */}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            {Array.from({ length: 7 }).map((_, index) => {
+              const stepNum = index + 1
+              const isCompleted = stepNum < currentStep
+              const isCurrent = stepNum === currentStep
+              
+              return (
+                <div
+                  key={stepNum}
+                  className={`flex-1 text-center transition-all`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mx-auto transition-all ${
+                    isCurrent
+                      ? isDark
+                        ? "bg-gray-200 text-gray-900 shadow-lg"
+                        : "bg-gray-900 text-white shadow-lg"
+                      : isCompleted
+                        ? isDark
+                          ? "bg-gray-600 text-white"
+                          : "bg-gray-400 text-white"
+                        : isDark
+                          ? "bg-gray-700 text-gray-400 hover:bg-gray-600"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  }`}>
+                    {isCompleted ? <Check className="h-4 w-4" /> : stepNum === 7 ? "🎉" : stepNum}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Progress Bar */}
+          <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? "bg-gray-700" : "bg-gray-300"}`}>
+            <div
+              className={`h-full transition-all duration-500 ease-out ${
+                isDark
+                  ? "bg-gradient-to-r from-gray-400 to-gray-200"
+                  : "bg-gradient-to-r from-gray-800 to-gray-900"
+              }`}
+              style={{
+                width: `${((currentStep - 1) / 6) * 100}%`,
+              }}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Hero Section */}
       <section className={`border-b ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-100 bg-white"}`}>
@@ -177,7 +379,7 @@ export default function TransactionJourney() {
                 <p className={`text-sm font-semibold tracking-widest uppercase mb-2 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
                   Step {step.id}
                 </p>
-                <h2 className={`text-3xl md:text-4xl font-bold mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
                   {language === "ko" ? step.titleKo : step.titleEn}
                 </h2>
                 <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>
@@ -189,15 +391,232 @@ export default function TransactionJourney() {
                 {language === "ko" ? step.detailsKo : step.detailsEn}
               </p>
 
-              {/* Placeholder for Interactive UI */}
-              <div className={`border rounded-none p-12 text-center ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
-                <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                  Interactive Experience - Step {step.id}
-                </p>
-                <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  Placeholder for interactive UI component
-                </p>
-              </div>
+              {/* Interactive UI for Step 1 */}
+              {step.id === 1 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className={`relative max-w-md mx-auto p-6 rounded-none border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                    {/* Stamp Overlay */}
+                    {step1ShowStamp && (
+                      <div className="stamp-animation absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="relative w-40 h-40">
+                          <svg
+                            viewBox="0 0 200 200"
+                            className="w-full h-full"
+                            style={{
+                              filter: "drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))"
+                            }}
+                          >
+                            {/* Outer decorative circle */}
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="95"
+                              fill="none"
+                              stroke="#dc2626"
+                              strokeWidth="2"
+                              opacity="0.3"
+                            />
+                            
+                            {/* Main circle with star pattern */}
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="85"
+                              fill="none"
+                              stroke="#dc2626"
+                              strokeWidth="4"
+                            />
+                            
+                            {/* Inner circle */}
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="75"
+                              fill="none"
+                              stroke="#dc2626"
+                              strokeWidth="2"
+                            />
+
+                            {/* Stars */}
+                            <g>
+                              <polygon
+                                points="155,45 156.5,49 161,49.5 157.5,53 159,58 155,55 151,58 152.5,53 149,49.5 153.5,49"
+                                fill="#dc2626"
+                              />
+                              <polygon
+                                points="155,155 156.5,151 161,150.5 157.5,147 159,142 155,145 151,142 152.5,147 149,150.5 153.5,151"
+                                fill="#dc2626"
+                              />
+                              <polygon
+                                points="45,155 46.5,151 51,150.5 47.5,147 49,142 45,145 41,142 42.5,147 39,150.5 43.5,151"
+                                fill="#dc2626"
+                              />
+                              <polygon
+                                points="45,45 46.5,49 51,49.5 47.5,53 49,58 45,55 41,58 42.5,53 39,49.5 43.5,49"
+                                fill="#dc2626"
+                              />
+                            </g>
+
+                            {/* Checkmark */}
+                            <path
+                              d="M 70 100 L 90 120 L 135 70"
+                              stroke="#dc2626"
+                              strokeWidth="8"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+
+                            {/* Text paths */}
+                            <defs>
+                              <path
+                                id="topCurve"
+                                d="M 30,100 A 70,70 0 0,1 170,100"
+                                fill="none"
+                              />
+                              <path
+                                id="bottomCurve"
+                                d="M 170,100 A 70,70 0 0,1 30,100"
+                                fill="none"
+                              />
+                            </defs>
+                            
+                            <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                              <textPath href="#topCurve" startOffset="50%" textAnchor="middle">
+                                MISSION
+                              </textPath>
+                            </text>
+                            
+                            <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                              <textPath href="#bottomCurve" startOffset="50%" textAnchor="middle">
+                                COMPLETE
+                              </textPath>
+                            </text>
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Receipt Content */}
+                    {!step1Completed ? (
+                      <div>
+                        {/* Receipt Header */}
+                        <div className="text-center mb-6 pb-4 border-b border-gray-400">
+                          <p className={`text-xs font-mono tracking-widest ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                            ===== RECEIPT =====
+                          </p>
+                          <p className={`text-xs mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            {new Date().toLocaleString()}
+                          </p>
+                        </div>
+
+                        {/* Amount Input */}
+                        <div className="mb-6">
+                          <label className={`block text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                            {language === "ko" ? "출금 금액" : "Withdrawal Amount"}
+                          </label>
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              type="number"
+                              value={step1Amount}
+                              onChange={(e) => setStep1Amount(e.target.value)}
+                              placeholder={language === "ko" ? "예: 100" : "e.g., 100"}
+                              className={`flex-1 px-3 py-2 border rounded-none text-sm font-mono ${
+                                isDark 
+                                  ? "bg-gray-800 border-gray-600 text-white" 
+                                  : "bg-white border-gray-300 text-gray-900"
+                              }`}
+                            />
+                            <span className={`text-sm font-semibold ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                              APT
+                            </span>
+                          </div>
+                          
+                          {/* Gas Fee */}
+                          <div className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                            {language === "ko" ? "가스비" : "Gas Fee"}: 0.001 APT
+                          </div>
+                        </div>
+
+                        {/* Signature Input */}
+                        <div className="mb-6">
+                          <label className={`block text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                            {language === "ko" ? "서명 (마우스로 그리세요)" : "Signature (Draw with mouse)"}
+                          </label>
+                          <div className={`border-2 rounded-none overflow-hidden ${isDark ? "border-gray-600" : "border-gray-300"}`}>
+                            <canvas
+                              ref={canvasRef}
+                              onMouseDown={startDrawing}
+                              onMouseMove={draw}
+                              onMouseUp={stopDrawing}
+                              onMouseLeave={stopDrawing}
+                              className={`block w-full cursor-crosshair ${isDark ? "bg-gray-900" : "bg-white"}`}
+                              style={{ height: "80px", display: "block" }}
+                            />
+                          </div>
+                          {step1Signature && (
+                            <button
+                              onClick={clearSignature}
+                              className={`mt-2 flex items-center gap-1 text-xs font-medium transition-colors ${
+                                isDark
+                                  ? "text-gray-400 hover:text-gray-200"
+                                  : "text-gray-600 hover:text-gray-900"
+                              }`}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              {language === "ko" ? "지우기" : "Clear"}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Receipt Footer */}
+                        <div className="border-t border-gray-400 pt-4 mb-6 text-xs text-center">
+                          <p className={isDark ? "text-gray-400" : "text-gray-600"}>
+                            {language === "ko" ? "아래 서명하여 확인하세요" : "Sign below to confirm"}
+                          </p>
+                        </div>
+
+                        {/* Send Button */}
+                        <button
+                          onClick={handleStep1Submit}
+                          disabled={!step1Amount || !step1Signature}
+                          className={`w-full py-2 px-4 font-semibold text-sm rounded-none transition-all ${
+                            !step1Amount || !step1Signature
+                              ? isDark 
+                                ? "bg-gray-700 text-gray-500 cursor-not-allowed" 
+                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              : isDark
+                                ? "bg-gray-200 text-gray-900 hover:bg-white"
+                                : "bg-gray-900 text-white hover:bg-black"
+                          }`}
+                        >
+                          {language === "ko" ? "보내기" : "Send"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={`text-center py-12 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                          {language === "ko" 
+                            ? `${step1Amount} APT 전송이 서명되었습니다` 
+                            : `Transfer of ${step1Amount} APT has been signed`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Placeholder for other steps */}
+              {step.id !== 1 && (
+                <div className={`border rounded-none p-12 text-center ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    Interactive Experience - Step {step.id}
+                  </p>
+                  <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    Placeholder for interactive UI component
+                  </p>
+                </div>
+              )}
             </section>
           ))}
         </article>
