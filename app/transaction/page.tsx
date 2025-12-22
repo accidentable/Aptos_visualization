@@ -35,11 +35,18 @@ export default function TransactionJourney() {
   // Step 2 states
   const [step2SelectedNode, setStep2SelectedNode] = useState<number | null>(null)
   const [step2ShowingNodeSelection, setStep2ShowingNodeSelection] = useState(false)
+  const [step2ShowingSelectionConfirm, setStep2ShowingSelectionConfirm] = useState(false)
+  const [step2IsRolling, setStep2IsRolling] = useState(false)
+  const [step2RollingNode, setStep2RollingNode] = useState(1)
   const [step2SignatureChecked, setStep2SignatureChecked] = useState(false)
   const [step2NonceChecked, setStep2NonceChecked] = useState(false)
   const [step2BalanceChecked, setStep2BalanceChecked] = useState(false)
   const [step2Completed, setStep2Completed] = useState(false)
   const [step2ShowStamp, setStep2ShowStamp] = useState(false)
+
+  // Step 3 states
+  const [step3Completed, setStep3Completed] = useState(false)
+  const [step3TransactionParticles, setStep3TransactionParticles] = useState<Array<{ id: number; x: number; delay: number }>>([])
 
   // Add stamp animation styles
   useEffect(() => {
@@ -97,6 +104,32 @@ export default function TransactionJourney() {
             transform: translateY(0);
           }
         }
+        
+        @keyframes transactionFall {
+          0% {
+            transform: translateY(-50px);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          90% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(600px);
+            opacity: 0;
+          }
+        }
+        
+        @keyframes transactionGlow {
+          0%, 100% {
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+          }
+          50% {
+            box-shadow: 0 0 30px rgba(34, 211, 238, 1);
+          }
+        }
       `
       document.head.appendChild(style)
     }
@@ -114,6 +147,50 @@ export default function TransactionJourney() {
       }
     }
   }, [isDark])
+
+  // Step 2: Node selection rolling animation
+  useEffect(() => {
+    if (step2IsRolling) {
+      const interval = setInterval(() => {
+        setStep2RollingNode((prev) => (prev % 7) + 1)
+      }, 100)
+      return () => clearInterval(interval)
+    }
+  }, [step2IsRolling])
+
+  // Step 3: Initialize transaction particles animation
+  useEffect(() => {
+    if (currentStep === 3 && !step3Completed) {
+      // Create 8-12 transaction particles
+      const particleCount = Math.floor(Math.random() * 5) + 8
+      const particles = Array.from({ length: particleCount }).map((_, i) => ({
+        id: i,
+        x: Math.random() * 80 + 10, // 10% ~ 90% of screen width
+        delay: Math.random() * 0.5 // 0 ~ 0.5s staggered start
+      }))
+      setStep3TransactionParticles(particles)
+
+      // Auto-complete Step 3 after 5 seconds and advance to Step 4
+      const timer = setTimeout(() => {
+        setStep3Completed(true)
+        setTimeout(() => {
+          setCurrentStep(4)
+        }, 500)
+      }, 5000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [currentStep, step3Completed])
+
+  // Auto-scroll to current step
+  useEffect(() => {
+    const element = document.getElementById(`step-${currentStep}`)
+    if (element) {
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: "smooth", block: "center" })
+      }, 100)
+    }
+  }, [currentStep])
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -324,8 +401,8 @@ export default function TransactionJourney() {
     <div className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-white"}`}>
       {/* Header */}
       <header className={`border-b ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} sticky top-0 z-50`}>
-        <div className="container mx-auto px-4 py-2 max-w-6xl">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 max-w-6xl">
+          <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => router.back()}
               className={`flex items-center gap-2 transition-colors ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-900"}`}
@@ -333,6 +410,52 @@ export default function TransactionJourney() {
               <ArrowLeft className="h-4 w-4" />
               <span className="text-sm font-medium">Back</span>
             </button>
+            
+            {/* Progress Bar with Step Numbers */}
+            <div className="flex-1 ml-10">
+              <div className="flex items-center justify-between gap-0">
+                {Array.from({ length: 7 }).map((_, index) => {
+                  const stepNum = index + 1
+                  const isCompleted = stepNum < currentStep
+                  const isCurrent = stepNum === currentStep
+                  
+                  return (
+                    <div key={stepNum} className="flex items-center flex-1">
+                      {/* Step Number */}
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 ${
+                        isCurrent
+                          ? isDark
+                            ? "bg-gray-200 text-gray-900 shadow-lg"
+                            : "bg-gray-900 text-white shadow-lg"
+                          : isCompleted
+                            ? isDark
+                              ? "bg-gray-600 text-white"
+                              : "bg-gray-400 text-white"
+                            : isDark
+                              ? "bg-gray-700 text-gray-400"
+                              : "bg-gray-200 text-gray-600"
+                      }`}>
+                        {isCompleted ? <Check className="h-3 w-3" /> : stepNum === 7 ? "🎉" : stepNum}
+                      </div>
+                      
+                      {/* Progress Line */}
+                      {stepNum < 7 && (
+                        <div className={`flex-1 h-1 mx-1 transition-all ${
+                          stepNum < currentStep
+                            ? isDark
+                              ? "bg-gray-600"
+                              : "bg-gray-400"
+                            : isDark
+                              ? "bg-gray-700"
+                              : "bg-gray-300"
+                        }`} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
@@ -346,11 +469,17 @@ export default function TransactionJourney() {
                   // Reset Step 2
                   setStep2SelectedNode(null)
                   setStep2ShowingNodeSelection(false)
+                  setStep2ShowingSelectionConfirm(false)
+                  setStep2IsRolling(false)
+                  setStep2RollingNode(1)
                   setStep2SignatureChecked(false)
                   setStep2NonceChecked(false)
                   setStep2BalanceChecked(false)
                   setStep2Completed(false)
                   setStep2ShowStamp(false)
+                  // Reset Step 3
+                  setStep3Completed(false)
+                  setStep3TransactionParticles([])
                 }}
                 className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
                   isDark 
@@ -385,56 +514,7 @@ export default function TransactionJourney() {
         </div>
       </header>
 
-      {/* Progress Bar */}
-      <div className={`${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"} border-b sticky top-12 z-40`}>
-        <div className="container mx-auto px-4 py-4 max-w-6xl">
-          {/* Step Numbers */}
-          <div className="flex items-center justify-between gap-2 mb-4">
-            {Array.from({ length: 7 }).map((_, index) => {
-              const stepNum = index + 1
-              const isCompleted = stepNum < currentStep
-              const isCurrent = stepNum === currentStep
-              
-              return (
-                <div
-                  key={stepNum}
-                  className={`flex-1 text-center transition-all`}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mx-auto transition-all ${
-                    isCurrent
-                      ? isDark
-                        ? "bg-gray-200 text-gray-900 shadow-lg"
-                        : "bg-gray-900 text-white shadow-lg"
-                      : isCompleted
-                        ? isDark
-                          ? "bg-gray-600 text-white"
-                          : "bg-gray-400 text-white"
-                        : isDark
-                          ? "bg-gray-700 text-gray-400 hover:bg-gray-600"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                  }`}>
-                    {isCompleted ? <Check className="h-4 w-4" /> : stepNum === 7 ? "🎉" : stepNum}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Progress Bar */}
-          <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? "bg-gray-700" : "bg-gray-300"}`}>
-            <div
-              className={`h-full transition-all duration-500 ease-out ${
-                isDark
-                  ? "bg-gradient-to-r from-gray-400 to-gray-200"
-                  : "bg-gradient-to-r from-gray-800 to-gray-900"
-              }`}
-              style={{
-                width: `${((currentStep - 1) / 6) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Hero Section */}
 
       {/* Hero Section */}
       <section className={`border-b ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-100 bg-white"}`}>
@@ -468,7 +548,11 @@ export default function TransactionJourney() {
         {/* Article Content */}
         <article className="mb-24">
           {transactionSteps.map((step, index) => (
-            <section key={step.id} className={`mb-16 pb-16 ${index !== transactionSteps.length - 1 ? `border-b ${isDark ? "border-gray-700" : "border-gray-200"}` : ""}`}>
+            <section 
+              key={step.id} 
+              id={`step-${step.id}`}
+              className={`mb-16 pb-16 ${index !== transactionSteps.length - 1 ? `border-b ${isDark ? "border-gray-700" : "border-gray-200"}` : ""}`}
+            >
               <div className="mb-6">
                 <p className={`text-sm font-semibold tracking-widest uppercase mb-2 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
                   Step {step.id}
@@ -626,9 +710,9 @@ export default function TransactionJourney() {
                             </span>
                           </div>
                           
-                          {/* Gas Fee */}
+                          {/* Gas Fee - Auto calculated as 0.01% */}
                           <div className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                            {language === "ko" ? "가스비" : "Gas Fee"}: 0.001 APT
+                            {language === "ko" ? "가스비" : "Gas Fee"}: {step1Amount ? (parseFloat(step1Amount) * 0.0001).toFixed(2) : "0.00"} APT
                           </div>
                         </div>
 
@@ -710,20 +794,80 @@ export default function TransactionJourney() {
                         {!step2SelectedNode && (
                           <div>
                             <div className="flex items-end justify-center gap-3 mb-8">
-                              {Array.from({ length: 7 }).map((_, index) => (
-                                <div key={index} className="flex flex-col items-center">
-                                  <div className="text-3xl mb-2">💻</div>
-                                  <p className={`text-xs font-mono ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                    Node {index + 1}
-                                  </p>
-                                </div>
-                              ))}
+                              {Array.from({ length: 7 }).map((_, index) => {
+                                const nodeNum = index + 1
+                                const isHighlighted = step2IsRolling && step2RollingNode === nodeNum
+                                
+                                return (
+                                  <motion.div 
+                                    key={index} 
+                                    className="flex flex-col items-center cursor-pointer"
+                                    onClick={() => {
+                                      if (!step2IsRolling && step1Completed) {
+                                        setStep2IsRolling(true)
+                                        // Rolling animation for 2 seconds
+                                        setTimeout(() => {
+                                          setStep2IsRolling(false)
+                                          setStep2SelectedNode(nodeNum)
+                                          setStep2ShowingSelectionConfirm(true)
+                                          // Show confirmation for 4-5 seconds
+                                          setTimeout(() => {
+                                            setStep2ShowingSelectionConfirm(false)
+                                            handleReceiptScan()
+                                          }, 4500)
+                                        }, 2000)
+                                      }
+                                    }}
+                                    whileHover={!step2IsRolling && step1Completed ? { scale: 1.1 } : {}}
+                                  >
+                                    <motion.div 
+                                      className={`text-3xl mb-2 transition-all ${
+                                        isHighlighted 
+                                          ? "drop-shadow-lg" 
+                                          : ""
+                                      }`}
+                                      animate={isHighlighted ? {
+                                        scale: [1, 1.2, 1],
+                                        filter: ["drop-shadow(0 0 0px rgba(34, 211, 238, 0))", "drop-shadow(0 0 15px rgba(34, 211, 238, 1))", "drop-shadow(0 0 0px rgba(34, 211, 238, 0))"]
+                                      } : {}}
+                                      transition={{ duration: 0.1 }}
+                                    >
+                                      💻
+                                    </motion.div>
+                                    <p className={`text-xs font-mono transition-all ${
+                                      isHighlighted
+                                        ? isDark 
+                                          ? "text-cyan-400 font-bold" 
+                                          : "text-cyan-600 font-bold"
+                                        : isDark ? "text-gray-400" : "text-gray-600"
+                                    }`}>
+                                      Node {nodeNum}
+                                    </p>
+                                  </motion.div>
+                                )
+                              })}
                             </div>
                             <button
-                              onClick={handleStep2Submit}
-                              disabled={!step1Completed}
+                              onClick={() => {
+                                if (!step2IsRolling && step1Completed) {
+                                  setStep2IsRolling(true)
+                                  // Rolling animation for 2 seconds, then select random node
+                                  setTimeout(() => {
+                                    setStep2IsRolling(false)
+                                    const randomNode = Math.floor(Math.random() * 7) + 1
+                                    setStep2SelectedNode(randomNode)
+                                    setStep2ShowingSelectionConfirm(true)
+                                    // Show confirmation for 4-5 seconds
+                                    setTimeout(() => {
+                                      setStep2ShowingSelectionConfirm(false)
+                                      handleReceiptScan()
+                                    }, 4500)
+                                  }, 2000)
+                                }
+                              }}
+                              disabled={!step1Completed || step2IsRolling}
                               className={`w-full py-3 px-4 font-semibold text-sm rounded-none transition-all ${
-                                !step1Completed
+                                !step1Completed || step2IsRolling
                                   ? isDark
                                     ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
@@ -732,7 +876,9 @@ export default function TransactionJourney() {
                                     : "bg-gray-900 text-white hover:bg-black"
                               }`}
                             >
-                              {language === "ko" ? "노드에 트랜잭션을 보내보세요" : "Send Transaction to Node"}
+                              {step2IsRolling 
+                                ? (language === "ko" ? "선택 중..." : "Selecting...") 
+                                : (language === "ko" ? "노드에 트랜잭션을 보내보세요" : "Send Transaction to Node")}
                             </button>
                           </div>
                         )}
@@ -753,8 +899,40 @@ export default function TransactionJourney() {
                           </div>
                         )}
 
+                        {/* Screen 1.6: Selection Confirmation */}
+                        {step2SelectedNode && step2ShowingSelectionConfirm && (
+                          <div className="min-h-96 flex flex-col items-center justify-center text-center">
+                            <motion.div
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ duration: 0.4, type: "spring", stiffness: 260, damping: 20 }}
+                            >
+                              <div className="text-6xl mb-6">💻</div>
+                              <p className={`text-3xl font-bold mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
+                                Node #{step2SelectedNode}
+                              </p>
+                              <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.2, duration: 0.5 }}
+                                className={`text-xl font-semibold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                              >
+                                {language === "ko" ? "노드가 선택되었습니다!" : "Node Selected!"}
+                              </motion.p>
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.4, type: "spring", stiffness: 260, damping: 20 }}
+                                className={`mt-6 text-4xl ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                              >
+                                ✓
+                              </motion.div>
+                            </motion.div>
+                          </div>
+                        )}
+
                         {/* Screen 2: Receipt Scanning */}
-                        {step2SelectedNode && !step2ShowingNodeSelection && !step2Completed && (
+                        {step2SelectedNode && !step2ShowingNodeSelection && !step2ShowingSelectionConfirm && !step2Completed && (
                           <div className="relative min-h-96 flex flex-col items-center justify-center">
                             {/* Blockchain Background */}
                             <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -933,7 +1111,7 @@ export default function TransactionJourney() {
                                     </span>
                                     <div className="flex items-center gap-2">
                                       <span className={`font-mono font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                                        0.001 APT
+                                        {step1Amount ? (parseFloat(step1Amount) * 0.0001).toFixed(2) : "0.00"} APT
                                       </span>
                                       {step2NonceChecked && (
                                         <motion.span
@@ -1029,8 +1207,109 @@ export default function TransactionJourney() {
                 </div>
               )}
 
+              {/* Interactive UI for Step 3 - Transaction Collection */}
+              {step.id === 3 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className={`relative max-w-2xl mx-auto h-96 rounded-none border-2 overflow-hidden flex flex-col items-center justify-center ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                    {/* Background grid pattern */}
+                    <div className="absolute inset-0 opacity-5 pointer-events-none">
+                      <svg className="w-full h-full">
+                        <defs>
+                          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke={isDark ? "#22d3ee" : "#06b6d4"} strokeWidth="1" />
+                          </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#grid)" />
+                      </svg>
+                    </div>
+
+                    {/* Transaction Pool - Grid of transactions being collected */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className="relative z-10 flex flex-col items-center gap-6 w-full px-8"
+                    >
+                      {/* Title and description */}
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="text-center mb-4"
+                      >
+                        <p className={`text-2xl font-bold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+                          {language === "ko" ? "Quorum Store" : "Quorum Store"}
+                        </p>
+                        <p className={`text-sm mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                          {language === "ko" ? "트랜잭션 풀 형성" : "Forming Transaction Pool"}
+                        </p>
+                      </motion.div>
+
+                      {/* Grid of transactions */}
+                      <div className="grid grid-cols-8 gap-2 max-w-md">
+                        {Array.from({ length: 16 }).map((_, i) => {
+                          const isUserTx = i === 15
+                          return (
+                            <motion.div
+                              key={i}
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: isUserTx ? 1 : 0.6 }}
+                              transition={{
+                                delay: i * 0.08,
+                                duration: 0.4,
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 20
+                              }}
+                              whileHover={isUserTx ? { scale: 1.2 } : {}}
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold cursor-default transition-all ${
+                                isUserTx
+                                  ? isDark
+                                    ? "bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg shadow-cyan-500/50"
+                                    : "bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg shadow-cyan-400/50"
+                                  : isDark
+                                    ? "bg-gray-700 text-gray-400"
+                                    : "bg-gray-200 text-gray-500"
+                              }`}
+                              style={isUserTx ? {
+                                boxShadow: isDark
+                                  ? "0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(6, 182, 212, 0.4)"
+                                  : "0 0 20px rgba(34, 211, 238, 0.6), 0 0 40px rgba(6, 182, 212, 0.3)"
+                              } : {}}
+                            >
+                              {isUserTx ? "✓" : `${i + 1}`}
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Status indicator */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5, duration: 0.5 }}
+                        className="text-center mt-6"
+                      >
+                        <motion.div
+                          animate={{
+                            y: [0, -3, 0]
+                          }}
+                          transition={{
+                            repeat: Infinity,
+                            duration: 1.5
+                          }}
+                          className={`text-sm font-medium ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                        >
+                          ● {language === "ko" ? "배치 생성 중" : "Creating Batch"}
+                        </motion.div>
+                      </motion.div>
+                    </motion.div>
+                  </div>
+                </div>
+              )}
+
               {/* Placeholder for other steps */}
-              {step.id !== 1 && step.id !== 2 && (
+              {step.id !== 1 && step.id !== 2 && step.id !== 3 && (
                 <div className={`border rounded-none p-12 text-center ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
                   <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                     Interactive Experience - Step {step.id}
