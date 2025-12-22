@@ -236,7 +236,7 @@ export default function TraditionalConsensusVisualization({ isAnimating }: { isA
       timeouts.forEach((t) => clearTimeout(t))
       intervals.forEach((i) => clearInterval(i))
     }
-  }, [isAnimating, nodes])
+  }, [isAnimating])
 
   return (
     <div ref={canvasRef} className="relative h-full w-full bg-gradient-to-b from-transparent to-transparent">
