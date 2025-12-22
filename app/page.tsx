@@ -14,8 +14,8 @@ interface DashboardItem {
 
 const dashboardItems: DashboardItem[] = [
   {
-    title: "Transaction의 여정",
-    description: "Quorum Store를 통해 트랜잭션이 처리되는 전 과정을 시각화로 체험해보세요",
+    title: "Aptos 체인은 왜 이렇게 빠를까?",
+    description: "앱토스 네트워크를 통해 트랜잭션이 처리되는 전 과정을 시각화로 체험해보세요",
     href: "/transaction",
     icon: <Flashlight className="h-5 w-5" />,
     duration: "5 min",
@@ -27,7 +27,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-2">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-auto items-center justify-center">
               <Image 
@@ -133,10 +133,10 @@ export default function Dashboard() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white mt-16">
-        <div className="container max-w-6xl mx-auto px-4 py-12">
+        <div className="container max-w-6xl mx-auto px-4 py-4">
           <div className="flex flex-col items-center justify-center text-center gap-4">
             <p className="text-sm text-gray-500">
-              Built by <span className="font-medium text-gray-900">@Ray</span> <span className="text-gray-400">Aptos</span>
+              Built by <span className="font-medium text-gray-900"><a href="https://x.com/taeho35858" target="_blank" rel="noopener noreferrer">@Ray</a></span> <span className="text-gray-400">Aptos</span>
             </p>
           </div>
         </div>
