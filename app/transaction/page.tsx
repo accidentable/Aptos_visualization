@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Sun, Moon, Check, RotateCcw } from "lucide-react"
 
@@ -26,9 +27,19 @@ export default function TransactionJourney() {
   // Step 1 states
   const [step1Amount, setStep1Amount] = useState("")
   const [step1Signature, setStep1Signature] = useState(false)
+  const [step1SignatureImage, setStep1SignatureImage] = useState<string | null>(null)
   const [step1Completed, setStep1Completed] = useState(false)
   const [step1ShowStamp, setStep1ShowStamp] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
+
+  // Step 2 states
+  const [step2SelectedNode, setStep2SelectedNode] = useState<number | null>(null)
+  const [step2ShowingNodeSelection, setStep2ShowingNodeSelection] = useState(false)
+  const [step2SignatureChecked, setStep2SignatureChecked] = useState(false)
+  const [step2NonceChecked, setStep2NonceChecked] = useState(false)
+  const [step2BalanceChecked, setStep2BalanceChecked] = useState(false)
+  const [step2Completed, setStep2Completed] = useState(false)
+  const [step2ShowStamp, setStep2ShowStamp] = useState(false)
 
   // Add stamp animation styles
   useEffect(() => {
@@ -57,6 +68,34 @@ export default function TransactionJourney() {
         
         .stamp-animation {
           animation: stampDrop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        
+        @keyframes cyanScanLine {
+          0% {
+            top: 0;
+            opacity: 0;
+          }
+          5% {
+            opacity: 1;
+          }
+          95% {
+            opacity: 1;
+          }
+          100% {
+            top: 100%;
+            opacity: 0;
+          }
+        }
+        
+        @keyframes slideDownFade {
+          0% {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
       `
       document.head.appendChild(style)
@@ -127,6 +166,9 @@ export default function TransactionJourney() {
         }
         if (hasDrawing) {
           setStep1Signature(true)
+          // Save signature as image
+          const signatureImage = canvas.toDataURL()
+          setStep1SignatureImage(signatureImage)
         }
       }
     }
@@ -140,6 +182,7 @@ export default function TransactionJourney() {
         ctx.fillStyle = isDark ? "#111827" : "#ffffff"
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         setStep1Signature(false)
+        setStep1SignatureImage(null)
       }
     }
   }
@@ -153,6 +196,48 @@ export default function TransactionJourney() {
         setCurrentStep(2)
       }, 3000)
     }
+  }
+
+  const handleStep2Submit = () => {
+    // Step 1: Random node selection after 1 second
+    setTimeout(() => {
+      const randomNode = Math.floor(Math.random() * 7) + 1
+      setStep2SelectedNode(randomNode)
+      setStep2ShowingNodeSelection(true)
+      
+      // Step 2: Show node selection for 2 seconds, then start scanning
+      setTimeout(() => {
+        setStep2ShowingNodeSelection(false)
+        handleReceiptScan()
+      }, 2000)
+    }, 1000)
+  }
+
+  const handleReceiptScan = () => {
+    // Sequential validation timing (1s, 2.5s, 4s)
+    setTimeout(() => {
+      setStep2SignatureChecked(true)
+    }, 1000)
+    
+    setTimeout(() => {
+      setStep2NonceChecked(true)
+    }, 2500)
+    
+    setTimeout(() => {
+      setStep2BalanceChecked(true)
+    }, 4000)
+    
+    // Show stamp at 5 seconds and auto-advance
+    setTimeout(() => {
+      setStep2ShowStamp(true)
+      setTimeout(() => {
+        setStep2ShowStamp(false)
+        setStep2Completed(true)
+        setTimeout(() => {
+          setCurrentStep(3)
+        }, 500)
+      }, 3000)
+    }, 5000)
   }
 
   const transactionSteps: TransactionStep[] = [
@@ -256,7 +341,16 @@ export default function TransactionJourney() {
                   setStep1ShowStamp(false)
                   setStep1Amount("")
                   setStep1Signature(false)
+                  setStep1SignatureImage(null)
                   clearSignature()
+                  // Reset Step 2
+                  setStep2SelectedNode(null)
+                  setStep2ShowingNodeSelection(false)
+                  setStep2SignatureChecked(false)
+                  setStep2NonceChecked(false)
+                  setStep2BalanceChecked(false)
+                  setStep2Completed(false)
+                  setStep2ShowStamp(false)
                 }}
                 className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
                   isDark 
@@ -606,8 +700,337 @@ export default function TransactionJourney() {
                 </div>
               )}
 
+              {/* Interactive UI for Step 2 - Admission Control */}
+              {step.id === 2 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className={`relative max-w-2xl mx-auto p-6 rounded-none border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                    {!step2Completed ? (
+                      <>
+                        {/* Screen 1: Node Selection */}
+                        {!step2SelectedNode && (
+                          <div>
+                            <div className="flex items-end justify-center gap-3 mb-8">
+                              {Array.from({ length: 7 }).map((_, index) => (
+                                <div key={index} className="flex flex-col items-center">
+                                  <div className="text-3xl mb-2">💻</div>
+                                  <p className={`text-xs font-mono ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                                    Node {index + 1}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={handleStep2Submit}
+                              disabled={!step1Completed}
+                              className={`w-full py-3 px-4 font-semibold text-sm rounded-none transition-all ${
+                                !step1Completed
+                                  ? isDark
+                                    ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                  : isDark
+                                    ? "bg-gray-200 text-gray-900 hover:bg-white"
+                                    : "bg-gray-900 text-white hover:bg-black"
+                              }`}
+                            >
+                              {language === "ko" ? "노드에 트랜잭션을 보내보세요" : "Send Transaction to Node"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Screen 1.5: Selected Node Display */}
+                        {step2SelectedNode && step2ShowingNodeSelection && (
+                          <div className="min-h-96 flex flex-col items-center justify-center text-center">
+                            <p className={`text-sm font-semibold mb-8 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+                              {language === "ko" ? "선택된 노드" : "Selected Node"}
+                            </p>
+                            <div className="text-6xl mb-8">💻</div>
+                            <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                              Node #{step2SelectedNode}
+                            </p>
+                            <p className={`text-sm mt-4 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                              {language === "ko" ? "트랜잭션 검증 중..." : "Validating transaction..."}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Screen 2: Receipt Scanning */}
+                        {step2SelectedNode && !step2ShowingNodeSelection && !step2Completed && (
+                          <div className="relative min-h-96 flex flex-col items-center justify-center">
+                            {/* Blockchain Background */}
+                            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                              <svg className="w-full h-full">
+                                {Array.from({ length: 10 }).map((_, i) => (
+                                  <circle
+                                    key={i}
+                                    cx={`${Math.random() * 100}%`}
+                                    cy={`${Math.random() * 100}%`}
+                                    r="2"
+                                    fill={isDark ? "#22d3ee" : "#06b6d4"}
+                                  />
+                                ))}
+                              </svg>
+                            </div>
+
+                            <div className="relative z-10 w-full text-center">
+                              <p className={`text-sm font-semibold mb-8 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+                                {language === "ko"
+                                  ? `Node #${step2SelectedNode}에서 검증 중...`
+                                  : `Validating on Node #${step2SelectedNode}...`}
+                              </p>
+
+                              {/* Receipt Card with Stamp Overlay */}
+                              <div
+                                className={`relative border-2 rounded-lg p-6 overflow-hidden max-w-md mx-auto ${
+                                  isDark
+                                    ? "border-cyan-500/40 bg-gray-900/80"
+                                    : "border-cyan-400/40 bg-white/80"
+                                }`}
+                                style={{
+                                  backdropFilter: "blur(10px)",
+                                  boxShadow: isDark
+                                    ? "0 20px 50px rgba(34, 211, 238, 0.3), inset 0 1px 0 rgba(34, 211, 238, 0.1)"
+                                    : "0 20px 50px rgba(6, 182, 212, 0.2), inset 0 1px 0 rgba(6, 182, 212, 0.1)"
+                                }}
+                              >
+                                {/* Stamp Overlay on Receipt */}
+                                {step2ShowStamp && (
+                                  <div className="stamp-animation absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                                    <svg width="140" height="140" viewBox="0 0 180 180">
+                                      <defs>
+                                        <filter id="dropShadow3">
+                                          <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3" />
+                                        </filter>
+                                        <path id="topCurve3" d="M 30 90 A 60 60 0 0 1 150 90" fill="none" />
+                                        <path id="bottomCurve3" d="M 150 90 A 60 60 0 0 1 30 90" fill="none" />
+                                      </defs>
+                                      <circle cx="90" cy="90" r="85" fill="none" stroke="#dc2626" strokeWidth="3" filter="url(#dropShadow3)" opacity="0.9" />
+                                      <circle cx="90" cy="90" r="75" fill="none" stroke="#dc2626" strokeWidth="2" opacity="0.7" />
+                                      <text x="40" y="35" fontSize="20" fill="#dc2626">★</text>
+                                      <text x="140" y="35" fontSize="20" fill="#dc2626">★</text>
+                                      <text x="40" y="145" fontSize="20" fill="#dc2626">★</text>
+                                      <text x="140" y="145" fontSize="20" fill="#dc2626">★</text>
+                                      <path
+                                        d="M 70 95 L 85 110 L 115 75"
+                                        stroke="#dc2626"
+                                        strokeWidth="6"
+                                        fill="none"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                      <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                                        <textPath href="#topCurve3" startOffset="50%" textAnchor="middle">
+                                          MISSION
+                                        </textPath>
+                                      </text>
+                                      <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                                        <textPath href="#bottomCurve3" startOffset="50%" textAnchor="middle">
+                                          COMPLETE
+                                        </textPath>
+                                      </text>
+                                    </svg>
+                                  </div>
+                                )}
+                                {/* Cyan Scan Line */}
+                                <div
+                                  className="h-1 z-20"
+                                  style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    background: "linear-gradient(90deg, transparent, rgba(34, 211, 238, 1), transparent)",
+                                    animation: "cyanScanLine 5s ease-in-out",
+                                    boxShadow: "0 0 20px rgba(34, 211, 238, 0.8)"
+                                  }}
+                                ></div>
+
+                                {/* Receipt Header */}
+                                <p className={`text-xs font-mono tracking-widest text-center mb-6 ${
+                                  isDark ? "text-gray-400" : "text-gray-500"
+                                }`}>
+                                  ◆ DIGITAL RECEIPT ◆
+                                </p>
+
+                                {/* Signature Image from Step 1 */}
+                                {step1SignatureImage && (
+                                  <div className="mb-4 border-b pb-4">
+                                    <p className={`text-xs font-mono text-center mb-2 ${
+                                      isDark ? "text-gray-500" : "text-gray-400"
+                                    }`}>
+                                      {language === "ko" ? "서명" : "Signature"}
+                                    </p>
+                                    <img
+                                      src={step1SignatureImage}
+                                      alt="signature"
+                                      className={`w-full h-12 rounded ${isDark ? "bg-gray-900" : "bg-white"}`}
+                                      style={{ objectFit: "contain" }}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Receipt Items */}
+                                <div className="space-y-4 text-sm">
+                                  {/* Item 1: Amount */}
+                                  <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{
+                                      opacity: 1,
+                                      x: 0,
+                                      backgroundColor: step2SignatureChecked 
+                                        ? isDark ? "rgb(34, 71, 91)" : "rgb(207, 250, 254)" 
+                                        : isDark ? "rgb(31, 41, 55, 0.3)" : "rgb(255, 255, 255, 0.3)"
+                                    }}
+                                    transition={{ duration: 0.5, delay: 0.2 }}
+                                    className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
+                                      step2SignatureChecked
+                                        ? isDark
+                                          ? "border border-cyan-500/50"
+                                          : "border border-cyan-400/50"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                                      {language === "ko" ? "출금 금액" : "Amount"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-mono font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                                        {step1Amount} APT
+                                      </span>
+                                      {step2SignatureChecked && (
+                                        <motion.span
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                        >
+                                          ✓
+                                        </motion.span>
+                                      )}
+                                    </div>
+                                  </motion.div>
+
+                                  {/* Item 2: Gas Fee */}
+                                  <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{
+                                      opacity: 1,
+                                      x: 0,
+                                      backgroundColor: step2NonceChecked 
+                                        ? isDark ? "rgb(34, 71, 91)" : "rgb(207, 250, 254)" 
+                                        : isDark ? "rgb(31, 41, 55, 0.3)" : "rgb(255, 255, 255, 0.3)"
+                                    }}
+                                    transition={{ duration: 0.5, delay: 0.4 }}
+                                    className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
+                                      step2NonceChecked
+                                        ? isDark
+                                          ? "border border-cyan-500/50"
+                                          : "border border-cyan-400/50"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                                      {language === "ko" ? "가스비" : "Gas Fee"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-mono font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                                        0.001 APT
+                                      </span>
+                                      {step2NonceChecked && (
+                                        <motion.span
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                        >
+                                          ✓
+                                        </motion.span>
+                                      )}
+                                    </div>
+                                  </motion.div>
+
+                                  {/* Item 3: Signature */}
+                                  <motion.div
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{
+                                      opacity: 1,
+                                      x: 0,
+                                      backgroundColor: step2BalanceChecked 
+                                        ? isDark ? "rgb(34, 71, 91)" : "rgb(207, 250, 254)" 
+                                        : isDark ? "rgb(31, 41, 55, 0.3)" : "rgb(255, 255, 255, 0.3)"
+                                    }}
+                                    transition={{ duration: 0.5, delay: 0.6 }}
+                                    className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
+                                      step2BalanceChecked
+                                        ? isDark
+                                          ? "border border-cyan-500/50"
+                                          : "border border-cyan-400/50"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span className={isDark ? "text-gray-300" : "text-gray-700"}>
+                                      {language === "ko" ? "서명 상태" : "Signature"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={isDark ? "text-cyan-400" : "text-cyan-600"}>
+                                        {language === "ko" ? "유효" : "Valid"}
+                                      </span>
+                                      {step2BalanceChecked && (
+                                        <motion.span
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                        >
+                                          ✓
+                                        </motion.span>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                </div>
+                              </div>
+
+                              {/* Scanning Indicator */}
+                              <div className="mt-8">
+                                <div
+                                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md ${
+                                    isDark
+                                      ? "bg-cyan-900/30 border border-cyan-500/40"
+                                      : "bg-cyan-100/30 border border-cyan-400/40"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-2 h-2 rounded-full animate-pulse ${
+                                      isDark ? "bg-cyan-400" : "bg-cyan-600"
+                                    }`}
+                                  ></div>
+                                  <span
+                                    className={`text-xs font-semibold ${
+                                      isDark ? "text-cyan-400" : "text-cyan-600"
+                                    }`}
+                                  >
+                                    {language === "ko" ? "스캔 진행 중..." : "Scanning..."}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className={`text-center py-12 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                          {language === "ko"
+                            ? "트랜잭션이 승인제어를 통과했습니다"
+                            : "Transaction passed admission control"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Placeholder for other steps */}
-              {step.id !== 1 && (
+              {step.id !== 1 && step.id !== 2 && (
                 <div className={`border rounded-none p-12 text-center ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
                   <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                     Interactive Experience - Step {step.id}
