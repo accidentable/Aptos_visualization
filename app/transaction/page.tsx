@@ -46,7 +46,17 @@ export default function TransactionJourney() {
 
   // Step 3 states
   const [step3Completed, setStep3Completed] = useState(false)
+  const [step3Page, setStep3Page] = useState<"pool" | "batch">("pool") // pool: 멤풀 단계, batch: 배치 생성 단계
   const [step3TransactionParticles, setStep3TransactionParticles] = useState<Array<{ id: number; x: number; delay: number }>>([])
+  const [step3TransactionsInPool, setStep3TransactionsInPool] = useState<Array<{ id: number; fee: number }>>([])
+  const [step3DraggingTx, setStep3DraggingTx] = useState<number | null>(null)
+  const [step3HoveringOverPool, setStep3HoveringOverPool] = useState(false)
+  const [step3UserTxFee, setStep3UserTxFee] = useState(50)
+  const [step3ShowStamp, setStep3ShowStamp] = useState(false)
+  const [step3SelectedTxForBatch, setStep3SelectedTxForBatch] = useState<number[]>([])
+  const [step3BatchCreating, setStep3BatchCreating] = useState(false)
+  const [step3BatchCreated, setStep3BatchCreated] = useState(false)
+  const step3PoolRef = useRef<HTMLDivElement>(null)
 
   // Add stamp animation styles
   useEffect(() => {
@@ -77,7 +87,7 @@ export default function TransactionJourney() {
           animation: stampDrop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
         
-        @keyframes cyanScanLine {
+        @keyframes tealScanLine {
           0% {
             top: 0;
             opacity: 0;
@@ -124,10 +134,10 @@ export default function TransactionJourney() {
         
         @keyframes transactionGlow {
           0%, 100% {
-            box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+            box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
           }
           50% {
-            box-shadow: 0 0 30px rgba(34, 211, 238, 1);
+            box-shadow: 0 0 30px rgba(20, 184, 166, 1);
           }
         }
       `
@@ -170,17 +180,20 @@ export default function TransactionJourney() {
       }))
       setStep3TransactionParticles(particles)
 
-      // Auto-complete Step 3 after 5 seconds and advance to Step 4
+      // Auto-complete Step 3 after all transactions are in pool or 10 seconds
       const timer = setTimeout(() => {
-        setStep3Completed(true)
-        setTimeout(() => {
-          setCurrentStep(4)
-        }, 500)
-      }, 5000)
+        // Only auto-complete if user has dragged transactions
+        if (step3TransactionsInPool.length > 0) {
+          setStep3Completed(true)
+          setTimeout(() => {
+            setCurrentStep(4)
+          }, 500)
+        }
+      }, 10000)
 
       return () => clearTimeout(timer)
     }
-  }, [currentStep, step3Completed])
+  }, [currentStep, step3Completed, step3TransactionsInPool])
 
   // Auto-scroll to current step
   useEffect(() => {
@@ -342,14 +355,14 @@ export default function TransactionJourney() {
     },
     {
       id: 3,
-      titleKo: "멤풀",
-      titleEn: "Mempool",
-      descriptionKo: "유효한 트랜잭션이 노드의 멤풀에 임시 저장됩니다",
-      descriptionEn: "Valid transactions stored temporarily in node's mempool",
-      categoryKo: "임시 저장소",
-      categoryEn: "Temporary Storage",
-      detailsKo: "유효성 검사를 통과한 트랜잭션은 노드의 멤풀(Memory Pool)에 임시 저장됩니다. 멤풀은 아직 블록에 포함되지 않은 트랜잭션들을 관리하며, 우선순위에 따라 처리됩니다.",
-      detailsEn: "Transactions that pass validation are temporarily stored in the node's mempool (Memory Pool). The mempool manages transactions not yet included in a block and processes them according to priority."
+      titleKo: "멤풀 & 배치 생성",
+      titleEn: "Mempool & Batch Creation",
+      descriptionKo: "유효한 트랜잭션이 멤풀에 임시 저장되고 배치로 묶입니다",
+      descriptionEn: "Valid transactions stored in mempool and bundled into batches",
+      categoryKo: "데이터 수집",
+      categoryEn: "Data Collection",
+      detailsKo: "유효성 검사를 통과한 트랜잭션은 노드의 멤풀(Memory Pool)에 임시 저장됩니다. 멤풀은 아직 블록에 포함되지 않은 트랜잭션들을 관리하며, 우선순위(수수료)에 따라 처리됩니다. 그 후 여러 트랜잭션을 배치 단위로 묶어 효율적으로 처리할 수 있도록 준비합니다.",
+      detailsEn: "Transactions that pass validation are temporarily stored in the node's mempool (Memory Pool). The mempool manages transactions not yet included in a block and processes them according to priority(fee). Multiple transactions are then bundled into batches for efficient processing."
     },
     {
       id: 4,
@@ -480,6 +493,15 @@ export default function TransactionJourney() {
                   // Reset Step 3
                   setStep3Completed(false)
                   setStep3TransactionParticles([])
+                  setStep3TransactionsInPool([])
+                  setStep3DraggingTx(null)
+                  setStep3HoveringOverPool(false)
+                  setStep3UserTxFee(50)
+                  setStep3ShowStamp(false)
+                  setStep3Page("pool")
+                  setStep3BatchCreating(false)
+                  setStep3BatchCreated(false)
+                  setStep3SelectedTxForBatch([])
                 }}
                 className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
                   isDark 
@@ -814,7 +836,7 @@ export default function TransactionJourney() {
                                           setTimeout(() => {
                                             setStep2ShowingSelectionConfirm(false)
                                             handleReceiptScan()
-                                          }, 4500)
+                                          }, 3500)
                                         }, 2000)
                                       }
                                     }}
@@ -837,8 +859,8 @@ export default function TransactionJourney() {
                                     <p className={`text-xs font-mono transition-all ${
                                       isHighlighted
                                         ? isDark 
-                                          ? "text-cyan-400 font-bold" 
-                                          : "text-cyan-600 font-bold"
+                                          ? "text-teal-400 font-bold" 
+                                          : "text-teal-600 font-bold"
                                         : isDark ? "text-gray-400" : "text-gray-600"
                                     }`}>
                                       Node {nodeNum}
@@ -886,7 +908,7 @@ export default function TransactionJourney() {
                         {/* Screen 1.5: Selected Node Display */}
                         {step2SelectedNode && step2ShowingNodeSelection && (
                           <div className="min-h-96 flex flex-col items-center justify-center text-center">
-                            <p className={`text-sm font-semibold mb-8 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+                            <p className={`text-sm font-semibold mb-8 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                               {language === "ko" ? "선택된 노드" : "Selected Node"}
                             </p>
                             <div className="text-6xl mb-8">💻</div>
@@ -915,7 +937,7 @@ export default function TransactionJourney() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: 0.2, duration: 0.5 }}
-                                className={`text-xl font-semibold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                                className={`text-xl font-semibold ${isDark ? "text-teal-400" : "text-teal-600"}`}
                               >
                                 {language === "ko" ? "노드가 선택되었습니다!" : "Node Selected!"}
                               </motion.p>
@@ -923,7 +945,7 @@ export default function TransactionJourney() {
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 transition={{ delay: 0.4, type: "spring", stiffness: 260, damping: 20 }}
-                                className={`mt-6 text-4xl ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                                className={`mt-6 text-4xl ${isDark ? "text-teal-400" : "text-teal-600"}`}
                               >
                                 ✓
                               </motion.div>
@@ -950,7 +972,7 @@ export default function TransactionJourney() {
                             </div>
 
                             <div className="relative z-10 w-full text-center">
-                              <p className={`text-sm font-semibold mb-8 ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+                              <p className={`text-sm font-semibold mb-8 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
                                 {language === "ko"
                                   ? `Node #${step2SelectedNode}에서 검증 중...`
                                   : `Validating on Node #${step2SelectedNode}...`}
@@ -960,8 +982,8 @@ export default function TransactionJourney() {
                               <div
                                 className={`relative border-2 rounded-lg p-6 overflow-hidden max-w-md mx-auto ${
                                   isDark
-                                    ? "border-cyan-500/40 bg-gray-900/80"
-                                    : "border-cyan-400/40 bg-white/80"
+                                    ? "border-teal-500/40 bg-gray-900/80"
+                                    : "border-teal-400/40 bg-white/80"
                                 }`}
                                 style={{
                                   backdropFilter: "blur(10px)",
@@ -1008,7 +1030,7 @@ export default function TransactionJourney() {
                                     </svg>
                                   </div>
                                 )}
-                                {/* Cyan Scan Line */}
+                                {/* Teal Scan Line */}
                                 <div
                                   className="h-1 z-20"
                                   style={{
@@ -1017,7 +1039,7 @@ export default function TransactionJourney() {
                                     left: 0,
                                     right: 0,
                                     background: "linear-gradient(90deg, transparent, rgba(34, 211, 238, 1), transparent)",
-                                    animation: "cyanScanLine 5s ease-in-out",
+                                    animation: "tealScanLine 5s ease-in-out",
                                     boxShadow: "0 0 20px rgba(34, 211, 238, 0.8)"
                                   }}
                                 ></div>
@@ -1062,8 +1084,8 @@ export default function TransactionJourney() {
                                     className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
                                       step2SignatureChecked
                                         ? isDark
-                                          ? "border border-cyan-500/50"
-                                          : "border border-cyan-400/50"
+                                          ? "border border-teal-500/50"
+                                          : "border border-teal-400/50"
                                         : ""
                                     }`}
                                   >
@@ -1079,7 +1101,7 @@ export default function TransactionJourney() {
                                           initial={{ scale: 0 }}
                                           animate={{ scale: 1 }}
                                           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                          className={isDark ? "text-teal-400" : "text-teal-600"}
                                         >
                                           ✓
                                         </motion.span>
@@ -1101,8 +1123,8 @@ export default function TransactionJourney() {
                                     className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
                                       step2NonceChecked
                                         ? isDark
-                                          ? "border border-cyan-500/50"
-                                          : "border border-cyan-400/50"
+                                          ? "border border-teal-500/50"
+                                          : "border border-teal-400/50"
                                         : ""
                                     }`}
                                   >
@@ -1118,7 +1140,7 @@ export default function TransactionJourney() {
                                           initial={{ scale: 0 }}
                                           animate={{ scale: 1 }}
                                           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                          className={isDark ? "text-teal-400" : "text-teal-600"}
                                         >
                                           ✓
                                         </motion.span>
@@ -1140,8 +1162,8 @@ export default function TransactionJourney() {
                                     className={`flex justify-between items-center px-4 py-3 rounded transition-all ${
                                       step2BalanceChecked
                                         ? isDark
-                                          ? "border border-cyan-500/50"
-                                          : "border border-cyan-400/50"
+                                          ? "border border-teal-500/50"
+                                          : "border border-teal-400/50"
                                         : ""
                                     }`}
                                   >
@@ -1149,7 +1171,7 @@ export default function TransactionJourney() {
                                       {language === "ko" ? "서명 상태" : "Signature"}
                                     </span>
                                     <div className="flex items-center gap-2">
-                                      <span className={isDark ? "text-cyan-400" : "text-cyan-600"}>
+                                      <span className={isDark ? "text-teal-400" : "text-teal-600"}>
                                         {language === "ko" ? "유효" : "Valid"}
                                       </span>
                                       {step2BalanceChecked && (
@@ -1157,7 +1179,7 @@ export default function TransactionJourney() {
                                           initial={{ scale: 0 }}
                                           animate={{ scale: 1 }}
                                           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                                          className={isDark ? "text-cyan-400" : "text-cyan-600"}
+                                          className={isDark ? "text-teal-400" : "text-teal-600"}
                                         >
                                           ✓
                                         </motion.span>
@@ -1172,18 +1194,18 @@ export default function TransactionJourney() {
                                 <div
                                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md ${
                                     isDark
-                                      ? "bg-cyan-900/30 border border-cyan-500/40"
-                                      : "bg-cyan-100/30 border border-cyan-400/40"
+                                      ? "bg-teal-900/30 border border-teal-500/40"
+                                      : "bg-teal-100/30 border border-teal-400/40"
                                   }`}
                                 >
                                   <div
                                     className={`w-2 h-2 rounded-full animate-pulse ${
-                                      isDark ? "bg-cyan-400" : "bg-cyan-600"
+                                      isDark ? "bg-teal-400" : "bg-teal-600"
                                     }`}
                                   ></div>
                                   <span
                                     className={`text-xs font-semibold ${
-                                      isDark ? "text-cyan-400" : "text-cyan-600"
+                                      isDark ? "text-teal-400" : "text-teal-600"
                                     }`}
                                   >
                                     {language === "ko" ? "스캔 진행 중..." : "Scanning..."}
@@ -1207,103 +1229,562 @@ export default function TransactionJourney() {
                 </div>
               )}
 
-              {/* Interactive UI for Step 3 - Transaction Collection */}
-              {step.id === 3 && (
+              {/* Interactive UI for Step 3 - Drag & Drop Transaction Collection */}
+              {step.id === 3 && step3Page === "pool" && (
                 <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
-                  <div className={`relative max-w-2xl mx-auto h-96 rounded-none border-2 overflow-hidden flex flex-col items-center justify-center ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
-                    {/* Background grid pattern */}
-                    <div className="absolute inset-0 opacity-5 pointer-events-none">
-                      <svg className="w-full h-full">
-                        <defs>
-                          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke={isDark ? "#22d3ee" : "#06b6d4"} strokeWidth="1" />
-                          </pattern>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#grid)" />
-                      </svg>
-                    </div>
+                  <div className={`relative max-w-4xl mx-auto rounded-none p-8 flex gap-8 ${isDark ? "bg-gray-900" : "bg-white border border-gray-200"}`}>
+                    {/* Left side: User TX (Draggable) */}
+                    <div className="flex-1 flex flex-col items-center justify-start gap-4">
+                      <div className="text-center mb-2">
+                        <p className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                          {language === "ko" ? "사용자 TX" : "User TX"}
+                        </p>
+                        <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                          {language === "ko" ? "드래그 가능" : "Draggable"}
+                        </p>
+                      </div>
 
-                    {/* Transaction Pool - Grid of transactions being collected */}
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.5 }}
-                      className="relative z-10 flex flex-col items-center gap-6 w-full px-8"
-                    >
-                      {/* Title and description */}
+                      {/* Fee Slider */}
+                      <div className="w-full px-4">
+                        <div className="mb-2">
+                          <label className={`text-xs font-medium block mb-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            {language === "ko" ? "Gas/Fee 조절" : "Gas/Fee"}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="100"
+                            value={step3UserTxFee}
+                            onChange={(e) => setStep3UserTxFee(parseInt(e.target.value))}
+                            className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                          />
+                          <div className="flex justify-between items-center mt-1">
+                            <span className={`text-xs font-bold ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                              {step3UserTxFee}
+                            </span>
+                            <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              / 100
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Draggable TX Card - Size based on fee */}
                       <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                        className="text-center mb-4"
+                        draggable
+                        onDragStart={() => {
+                          setStep3DraggingTx(1)
+                        }}
+                        onDragEnd={() => {
+                          setStep3DraggingTx(null)
+                          setStep3HoveringOverPool(false)
+                        }}
+                        animate={{
+                          scale: step3DraggingTx === 1 ? 1.1 : 1,
+                          y: step3TransactionsInPool.length > 0 ? -10 : 0
+                        }}
+                        className={`rounded-none flex flex-col items-center justify-center font-bold text-sm cursor-grab active:cursor-grabbing transition-all ${
+                          step3TransactionsInPool.length === 0
+                            ? isDark
+                              ? "bg-teal-500 text-white shadow-lg shadow-teal-500/50"
+                              : "bg-teal-500 text-white shadow-lg shadow-teal-400/50"
+                            : isDark
+                              ? "bg-gray-600 text-gray-300 shadow-none"
+                              : "bg-gray-400 text-gray-600 shadow-none"
+                        }`}
+                        style={{
+                          width: `${40 + (step3UserTxFee / 100) * 80}px`,
+                          height: `${40 + (step3UserTxFee / 100) * 80}px`
+                        }}
                       >
-                        <p className={`text-2xl font-bold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
-                          {language === "ko" ? "Quorum Store" : "Quorum Store"}
-                        </p>
-                        <p className={`text-sm mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                          {language === "ko" ? "트랜잭션 풀 형성" : "Forming Transaction Pool"}
-                        </p>
+                        {step3TransactionsInPool.length === 0 ? "TX" : "✓"}
                       </motion.div>
 
-                      {/* Grid of transactions */}
-                      <div className="grid grid-cols-8 gap-2 max-w-md">
-                        {Array.from({ length: 16 }).map((_, i) => {
-                          const isUserTx = i === 15
+                      {/* TX Status */}
+                      {step3TransactionsInPool.length === 0 && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-center"
+                        >
+                          <p className={`text-xs ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                            {language === "ko" ? "검증 대기중..." : "Waiting..."}
+                          </p>
+                        </motion.div>
+                      )}
+                      {step3TransactionsInPool.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="text-center"
+                        >
+                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${isDark ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"}`}>
+                            <Check size={12} />
+                            {language === "ko" ? "검증됨" : "Validated"}
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* Center: Arrow or divider */}
+                    <div className="flex items-center justify-center">
+                      <div className={`w-8 h-0.5 ${isDark ? "bg-gradient-to-r from-gray-700 to-transparent" : "bg-gradient-to-r from-gray-300 to-transparent"}`}></div>
+                    </div>
+
+                    {/* Right side: MEMPOOL (Drop zone) */}
+                    <div className="flex-1 flex flex-col items-center justify-start gap-4">
+                      <div className="text-center mb-4">
+                        <p className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                          MEMPOOL
+                        </p>
+                        <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                          {language === "ko" ? "대기 중 (우선순위 정렬 중)" : "Pending (Sorted by Fee)"}
+                        </p>
+                      </div>
+
+                      {/* MEMPOOL Grid - Drop Zone */}
+                      <motion.div
+                        ref={step3PoolRef}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          setStep3HoveringOverPool(true)
+                        }}
+                        onDragLeave={() => {
+                          setStep3HoveringOverPool(false)
+                        }}
+                        onDrop={() => {
+                          if (step3DraggingTx === 1 && step3TransactionsInPool.length === 0) {
+                            // Create 9 other transactions with random fees
+                            const otherTxs = Array.from({ length: 9 }).map((_, i) => ({
+                              id: i + 2,
+                              fee: Math.floor(Math.random() * 80) + 10 // 10-90 범위의 랜덤 수수료
+                            }))
+                            // Add user's TX and shuffle randomly
+                            const allTxs = [...otherTxs, { id: 1, fee: step3UserTxFee }]
+                            // Fisher-Yates shuffle
+                            for (let i = allTxs.length - 1; i > 0; i--) {
+                              const j = Math.floor(Math.random() * (i + 1));
+                              [allTxs[i], allTxs[j]] = [allTxs[j], allTxs[i]];
+                            }
+                            setStep3TransactionsInPool(allTxs)
+                          }
+                          setStep3HoveringOverPool(false)
+                        }}
+                        animate={{
+                          backgroundColor: step3HoveringOverPool
+                            ? isDark
+                              ? "rgba(20, 184, 166, 0.1)"
+                              : "rgba(20, 184, 166, 0.05)"
+                            : "transparent",
+                          boxShadow: step3HoveringOverPool
+                            ? isDark
+                              ? "0 0 20px rgba(20, 184, 166, 0.3), inset 0 0 20px rgba(20, 184, 166, 0.1)"
+                              : "0 0 15px rgba(20, 184, 166, 0.2), inset 0 0 15px rgba(20, 184, 166, 0.05)"
+                            : "none"
+                        }}
+                        className={`w-full p-4 rounded-lg border-2 border-dashed flex items-center justify-center min-h-32 transition-all ${
+                          step3HoveringOverPool
+                            ? isDark
+                              ? "border-teal-400 bg-teal-500/10"
+                              : "border-teal-500 bg-teal-50"
+                            : isDark
+                              ? "border-gray-700 bg-gray-800/50"
+                              : "border-gray-300 bg-gray-50"
+                        }`}
+                      >
+                        {step3TransactionsInPool.length === 0 ? (
+                          <div className="text-center">
+                            <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                              {language === "ko" ? "TX를 여기로 드래그하세요" : "Drag TX here"}
+                            </p>
+                          </div>
+                        ) : (
+                          <motion.div
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="flex flex-wrap gap-4 w-full justify-center items-end"
+                          >
+                            {/* Sorted transactions in pool by fee (highest first) */}
+                            {step3TransactionsInPool.map((tx, index) => {
+                              const isUserTx = tx.id === 1
+                              // 박스 크기: 최소 12px + 수수료에 따른 추가 크기 (최대 62px)
+                              const boxSize = 12 + (tx.fee / 100) * 50
+
+                              return (
+                                <motion.div
+                                  key={`pool-tx-${tx.id}`}
+                                  initial={{ scale: 0, opacity: 0, y: 20 }}
+                                  animate={{ 
+                                    scale: 1, 
+                                    opacity: 1, 
+                                    y: 0
+                                  }}
+                                  transition={{ delay: index * 0.1 }}
+                                  className="flex flex-col items-center gap-2 group"
+                                >
+                                  <motion.div
+                                    animate={{
+                                      y: [0, -3, 2, -2, 0],
+                                      x: [-1, 1, -1, 1, 0],
+                                      rotate: [-1, 1, -0.5, 0.5, 0]
+                                    }}
+                                    transition={{
+                                      duration: 4,
+                                      repeat: Infinity,
+                                      repeatType: "loop",
+                                      ease: "easeInOut",
+                                      delay: index * 0.2
+                                    }}
+                                    className={`rounded-none flex items-center justify-center font-bold cursor-default transition-all relative ${
+                                      isUserTx
+                                        ? isDark
+                                          ? "bg-teal-500 text-white shadow-lg shadow-teal-500/50"
+                                          : "bg-teal-500 text-white shadow-lg shadow-teal-400/50"
+                                        : isDark
+                                          ? "bg-gray-500 text-white shadow-lg"
+                                          : "bg-gray-500 text-white shadow-lg"
+                                    }`}
+                                    style={{
+                                      width: `${boxSize}px`,
+                                      height: `${boxSize}px`,
+                                      fontSize: `${Math.max(8, boxSize * 0.3)}px`
+                                    }}
+                                  >
+                                    TX
+                                    
+                                    {/* Tooltip - Fee Info */}
+                                    <div className={`absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+                                      isDark ? "bg-gray-800 text-teal-300" : "bg-gray-700 text-teal-200"
+                                    }`}>
+                                      Fee: {tx.fee}
+                                    </div>
+                                  </motion.div>
+                                </motion.div>
+                              )
+                            })}
+                          </motion.div>
+                        )}
+                      </motion.div>
+
+                      {/* Pool Status */}
+                      {step3TransactionsInPool.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-center"
+                        >
+                          <motion.div
+                            animate={{
+                              y: [0, -2, 0]
+                            }}
+                            transition={{
+                              repeat: Infinity,
+                              duration: 1.5
+                            }}
+                            className={`text-xs font-medium ${isDark ? "text-teal-400" : "text-teal-600"}`}
+                          >
+                            ● {language === "ko" ? "풀 형성 완료" : "Pool Ready"}
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Auto-advance button when transaction is in pool */}
+                  {step3TransactionsInPool.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-center mt-6"
+                    >
+                      <button
+                        onClick={() => {
+                          setStep3Page("batch")
+                        }}
+                        className={`px-6 py-2 rounded-lg font-medium text-sm transition-all ${
+                          isDark
+                            ? "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-500/30"
+                            : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-400/30"
+                        }`}
+                      >
+                        {language === "ko" ? "배치 생성" : "Create Batch"}
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {/* Step 3 Completion Stamp */}
+                  {step3ShowStamp && (
+                    <div className={`absolute inset-0 flex items-center justify-center pointer-events-none rounded-none border-2 ${isDark ? "border-gray-600 bg-gray-900/80" : "border-gray-300 bg-white/80"}`}>
+                      <div className="stamp-animation text-6xl opacity-80">✓</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3 - Batch Creation Page */}
+              {step.id === 3 && step3Page === "batch" && (
+                <div className={`border rounded-none p-4 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className={`relative max-w-3xl mx-auto rounded-none p-4 ${isDark ? "bg-gray-900" : "bg-white border border-gray-200"}`}>
+                    {/* Batch Creation Title */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center mb-4"
+                    >
+                      <p className={`text-lg font-bold ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                        {language === "ko" ? "배치(Batch) 생성" : "Creating Batch"}
+                      </p>
+                      <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        {language === "ko" ? "TX를 선택하여 배치로 박싱하세요" : "Select TXs and create a batch"}
+                      </p>
+                    </motion.div>
+
+                    {/* Pool Display with Selection */}
+                    <div className={`relative w-full rounded-lg border-2 border-dashed p-4 mb-6 ${
+                      isDark ? "border-gray-700 bg-gray-800/50" : "border-gray-300 bg-gray-50"
+                    }`}>
+                      <div className={`text-xs font-medium text-center mb-3 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        {language === "ko" ? "멤풀에서 선택하기" : "Select from Pool"}
+                      </div>
+
+                      {/* Selectable TXs in Pool */}
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {step3TransactionsInPool.map((tx) => {
+                          const isSelected = step3SelectedTxForBatch.includes(tx.id)
+                          const boxSize = 12 + (tx.fee / 100) * 50
+
                           return (
                             <motion.div
-                              key={i}
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: isUserTx ? 1 : 0.6 }}
-                              transition={{
-                                delay: i * 0.08,
-                                duration: 0.4,
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 20
+                              key={`select-tx-${tx.id}`}
+                              whileHover={{ scale: 1.05 }}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setStep3SelectedTxForBatch(step3SelectedTxForBatch.filter(id => id !== tx.id))
+                                } else if (step3SelectedTxForBatch.length < 3) {
+                                  setStep3SelectedTxForBatch([...step3SelectedTxForBatch, tx.id])
+                                }
                               }}
-                              whileHover={isUserTx ? { scale: 1.2 } : {}}
-                              className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold cursor-default transition-all ${
-                                isUserTx
-                                  ? isDark
-                                    ? "bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg shadow-cyan-500/50"
-                                    : "bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg shadow-cyan-400/50"
-                                  : isDark
-                                    ? "bg-gray-700 text-gray-400"
-                                    : "bg-gray-200 text-gray-500"
-                              }`}
-                              style={isUserTx ? {
-                                boxShadow: isDark
-                                  ? "0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(6, 182, 212, 0.4)"
-                                  : "0 0 20px rgba(34, 211, 238, 0.6), 0 0 40px rgba(6, 182, 212, 0.3)"
-                              } : {}}
+                              className="cursor-pointer flex flex-col items-center gap-1"
                             >
-                              {isUserTx ? "✓" : `${i + 1}`}
+                              <motion.div
+                                animate={{
+                                  y: [0, -3, 2, -2, 0],
+                                  x: [-1, 1, -1, 1, 0],
+                                  rotate: [-1, 1, -0.5, 0.5, 0]
+                                }}
+                                transition={{
+                                  duration: 4,
+                                  repeat: Infinity,
+                                  repeatType: "loop",
+                                  ease: "easeInOut",
+                                  delay: Math.random() * 0.5
+                                }}
+                                className={`rounded-none flex items-center justify-center font-bold cursor-pointer transition-all ${
+                                  isSelected
+                                    ? isDark
+                                      ? "bg-teal-400 text-gray-900 shadow-lg shadow-teal-400/80"
+                                      : "bg-teal-400 text-white shadow-lg shadow-teal-400/80"
+                                    : isDark
+                                      ? "bg-gray-500 text-white shadow-lg"
+                                      : "bg-gray-500 text-white shadow-lg"
+                                }`}
+                                style={{
+                                  width: `${boxSize}px`,
+                                  height: `${boxSize}px`,
+                                  fontSize: `${Math.max(8, boxSize * 0.3)}px`
+                                }}
+                              >
+                                TX
+                              </motion.div>
+
+                              {/* Fee Display */}
+                              <p className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                                {tx.fee}APT
+                              </p>
                             </motion.div>
                           )
                         })}
                       </div>
+                    </div>
 
-                      {/* Status indicator */}
+                    {/* Selection Info and Limit */}
+                    <div className="text-center mb-4">
+                      <p className={`text-xs font-medium mb-1 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                        {language === "ko" ? `선택됨: ${step3SelectedTxForBatch.length}개 / 최대 3개` : `Selected: ${step3SelectedTxForBatch.length} / Max 3`}
+                      </p>
+                      {step3SelectedTxForBatch.length > 0 && (
+                        <p className={`text-xs font-bold mb-1 ${isDark ? "text-green-400" : "text-green-600"}`}>
+                          {language === "ko" ? "총 수수료: " : "Total Fee: "}
+                          {step3TransactionsInPool
+                            .filter(tx => step3SelectedTxForBatch.includes(tx.id))
+                            .reduce((sum, tx) => sum + tx.fee, 0)}
+                          APT
+                        </p>
+                      )}
+                      <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        {language === "ko" ? "(최대 3개의 TX만 배치로 선택할 수 있습니다)" : "(You can select up to 3 TXs for batch)"}      
+                      </p>
+                    </div>
+
+                    {/* Create Batch Button */}
+                    {!step3BatchCreating && !step3BatchCreated && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex justify-center gap-3"
+                      >
+                        <button
+                          onClick={() => setStep3Page("pool")}
+                          className={`px-4 py-1 rounded-lg font-medium text-xs transition-all ${
+                            isDark
+                              ? "border border-gray-600 text-gray-300 hover:border-gray-400 hover:text-gray-100"
+                              : "border border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-900"
+                          }`}
+                        >
+                          {language === "ko" ? "뒤로" : "Back"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setStep3BatchCreating(true)
+                            setTimeout(() => {
+                              setStep3BatchCreating(false)
+                              setStep3BatchCreated(true)
+                            }, 2000)
+                          }}
+                          disabled={step3SelectedTxForBatch.length === 0}
+                          className={`px-4 py-1 rounded-lg font-medium text-xs transition-all ${
+                            step3SelectedTxForBatch.length === 0
+                              ? isDark
+                                ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : isDark
+                                ? "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-500/30"
+                                : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-400/30"
+                          }`}
+                        >
+                          {language === "ko" ? "배치 생성" : "Create Batch"}
+                        </button>
+                      </motion.div>
+                    )}
+
+                    {/* Batch Creation Progress */}
+                    {step3BatchCreating && (
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: 0.5, duration: 0.5 }}
-                        className="text-center mt-6"
+                        className="flex flex-col items-center gap-4"
                       >
+                        <div className={`relative w-24 h-24 rounded-lg border-2 flex items-center justify-center ${
+                          isDark ? "border-teal-500 bg-teal-500/10" : "border-teal-500 bg-teal-50"
+                        }`}>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                            className={`text-2xl font-bold ${isDark ? "text-teal-400" : "text-teal-600"}`}
+                          >
+                            ⚙️
+                          </motion.div>
+                        </div>
                         <motion.div
-                          animate={{
-                            y: [0, -3, 0]
-                          }}
-                          transition={{
-                            repeat: Infinity,
-                            duration: 1.5
-                          }}
-                          className={`text-sm font-medium ${isDark ? "text-cyan-400" : "text-cyan-600"}`}
+                          animate={{ y: [0, -3, 0] }}
+                          transition={{ repeat: Infinity, duration: 1.5 }}
+                          className={`text-sm font-medium ${isDark ? "text-teal-400" : "text-teal-600"}`}
                         >
-                          ● {language === "ko" ? "배치 생성 중" : "Creating Batch"}
+                          ● {language === "ko" ? "배치 생성 중" : "Creating Batch..."}
                         </motion.div>
                       </motion.div>
-                    </motion.div>
+                    )}
+
+                    {/* Batch Created Status */}
+                    {step3BatchCreated && !step3ShowStamp && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center"
+                      >
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                          className={`inline-block p-2 rounded-lg mb-2 ${
+                            isDark ? "bg-green-900/30" : "bg-green-100"
+                          }`}
+                        >
+                          <p className={`text-sm font-bold ${isDark ? "text-green-400" : "text-green-600"}`}>
+                            {language === "ko" ? "배치 생성 완료!" : "Batch Created!"}
+                          </p>
+                        </motion.div>
+                        <p className={`text-xs mb-3 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                          {language === "ko" ? `${step3SelectedTxForBatch.length}개의 TX가 배치로 생성되었습니다` : `${step3SelectedTxForBatch.length} TXs packed into batch`}
+                        </p>
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                          className="flex justify-center"
+                        >
+                          <button
+                            onClick={() => {
+                              setStep3ShowStamp(true)
+                              setTimeout(() => {
+                                setStep3Completed(true)
+                                setTimeout(() => {
+                                  setCurrentStep(4)
+                                }, 500)
+                              }, 1500)
+                            }}
+                            className={`px-4 py-1 rounded-lg font-medium text-xs transition-all ${
+                              isDark
+                                ? "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-500/30"
+                                : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 text-white shadow-lg shadow-teal-400/30"
+                            }`}
+                          >
+                            {language === "ko" ? "다음 단계로" : "Next Step"}
+                          </button>
+                        </motion.div>
+                      </motion.div>
+                    )}
+
+                    {/* Batch Completion Stamp */}
+                    {step3ShowStamp && (
+                      <div className={`absolute inset-0 flex items-center justify-center pointer-events-none rounded-lg border-2 ${isDark ? "border-gray-600 bg-gray-900/80" : "border-gray-300 bg-white/80"}`}>
+                        <div className="stamp-animation">
+                          <svg width="140" height="140" viewBox="0 0 180 180">
+                            <defs>
+                              <filter id="dropShadow4">
+                                <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3" />
+                              </filter>
+                              <path id="topCurve4" d="M 30 90 A 60 60 0 0 1 150 90" fill="none" />
+                              <path id="bottomCurve4" d="M 150 90 A 60 60 0 0 1 30 90" fill="none" />
+                            </defs>
+                            <circle cx="90" cy="90" r="85" fill="none" stroke="#dc2626" strokeWidth="3" filter="url(#dropShadow4)" opacity="0.9" />
+                            <circle cx="90" cy="90" r="75" fill="none" stroke="#dc2626" strokeWidth="2" opacity="0.7" />
+                            <text x="40" y="35" fontSize="20" fill="#dc2626">★</text>
+                            <text x="140" y="35" fontSize="20" fill="#dc2626">★</text>
+                            <text x="40" y="145" fontSize="20" fill="#dc2626">★</text>
+                            <text x="140" y="145" fontSize="20" fill="#dc2626">★</text>
+                            <path
+                              d="M 70 95 L 85 110 L 115 75"
+                              stroke="#dc2626"
+                              strokeWidth="6"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                              <textPath href="#topCurve4" startOffset="50%" textAnchor="middle">
+                                MISSION
+                              </textPath>
+                            </text>
+                            <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                              <textPath href="#bottomCurve4" startOffset="50%" textAnchor="middle">
+                                COMPLETE
+                              </textPath>
+                            </text>
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
