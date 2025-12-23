@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Sun, Moon, Check, RotateCcw } from "lucide-react"
+import QuorumStorePropagation from "@/components/quorum-store-propagation"
 
 interface TransactionStep {
   id: number
@@ -56,6 +57,7 @@ export default function TransactionJourney() {
   const [step3SelectedTxForBatch, setStep3SelectedTxForBatch] = useState<number[]>([])
   const [step3BatchCreating, setStep3BatchCreating] = useState(false)
   const [step3BatchCreated, setStep3BatchCreated] = useState(false)
+  const [step4ShowStamp, setStep4ShowStamp] = useState(false)
   const step3PoolRef = useRef<HTMLDivElement>(null)
 
   // Add stamp animation styles
@@ -289,18 +291,16 @@ export default function TransactionJourney() {
   }
 
   const handleStep2Submit = () => {
-    // Step 1: Random node selection after 1 second
+    // Step 1: Random node selection
+    const randomNode = Math.floor(Math.random() * 7) + 1
+    setStep2SelectedNode(randomNode)
+    setStep2ShowingNodeSelection(true)
+    
+    // Step 2: Show node selection for 0.5 seconds, then start scanning
     setTimeout(() => {
-      const randomNode = Math.floor(Math.random() * 7) + 1
-      setStep2SelectedNode(randomNode)
-      setStep2ShowingNodeSelection(true)
-      
-      // Step 2: Show node selection for 2 seconds, then start scanning
-      setTimeout(() => {
-        setStep2ShowingNodeSelection(false)
-        handleReceiptScan()
-      }, 2000)
-    }, 1000)
+      setStep2ShowingNodeSelection(false)
+      handleReceiptScan()
+    }, 500)
   }
 
   const handleReceiptScan = () => {
@@ -502,6 +502,9 @@ export default function TransactionJourney() {
                   setStep3BatchCreating(false)
                   setStep3BatchCreated(false)
                   setStep3SelectedTxForBatch([])
+                  // Reset Step 4
+                  setStep4ShowStamp(false)
+                  // Step 4 is automatically reset when currentStep changes to 1
                 }}
                 className={`px-3 py-1 text-xs font-medium border rounded-none transition-colors ${
                   isDark 
@@ -597,98 +600,37 @@ export default function TransactionJourney() {
                   <div className={`relative max-w-md mx-auto p-6 rounded-none border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
                     {/* Stamp Overlay */}
                     {step1ShowStamp && (
-                      <div className="stamp-animation absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="relative w-40 h-40">
-                          <svg
-                            viewBox="0 0 200 200"
-                            className="w-full h-full"
-                            style={{
-                              filter: "drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))"
-                            }}
-                          >
-                            {/* Outer decorative circle */}
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="95"
-                              fill="none"
-                              stroke="#dc2626"
-                              strokeWidth="2"
-                              opacity="0.3"
-                            />
-                            
-                            {/* Main circle with star pattern */}
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="85"
-                              fill="none"
-                              stroke="#dc2626"
-                              strokeWidth="4"
-                            />
-                            
-                            {/* Inner circle */}
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="75"
-                              fill="none"
-                              stroke="#dc2626"
-                              strokeWidth="2"
-                            />
-
-                            {/* Stars */}
-                            <g>
-                              <polygon
-                                points="155,45 156.5,49 161,49.5 157.5,53 159,58 155,55 151,58 152.5,53 149,49.5 153.5,49"
-                                fill="#dc2626"
-                              />
-                              <polygon
-                                points="155,155 156.5,151 161,150.5 157.5,147 159,142 155,145 151,142 152.5,147 149,150.5 153.5,151"
-                                fill="#dc2626"
-                              />
-                              <polygon
-                                points="45,155 46.5,151 51,150.5 47.5,147 49,142 45,145 41,142 42.5,147 39,150.5 43.5,151"
-                                fill="#dc2626"
-                              />
-                              <polygon
-                                points="45,45 46.5,49 51,49.5 47.5,53 49,58 45,55 41,58 42.5,53 39,49.5 43.5,49"
-                                fill="#dc2626"
-                              />
-                            </g>
-
-                            {/* Checkmark */}
+                      <div className={`absolute inset-0 flex items-center justify-center pointer-events-none rounded-none border-2 ${isDark ? "border-gray-600 bg-gray-900/80" : "border-gray-300 bg-white/80"}`}>
+                        <div className="stamp-animation">
+                          <svg width="140" height="140" viewBox="0 0 180 180">
+                            <defs>
+                              <filter id="dropShadow1">
+                                <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3" />
+                              </filter>
+                              <path id="topCurve1" d="M 30 90 A 60 60 0 0 1 150 90" fill="none" />
+                              <path id="bottomCurve1" d="M 150 90 A 60 60 0 0 1 30 90" fill="none" />
+                            </defs>
+                            <circle cx="90" cy="90" r="85" fill="none" stroke="#dc2626" strokeWidth="3" filter="url(#dropShadow1)" opacity="0.9" />
+                            <circle cx="90" cy="90" r="75" fill="none" stroke="#dc2626" strokeWidth="2" opacity="0.7" />
+                            <text x="40" y="35" fontSize="20" fill="#dc2626">★</text>
+                            <text x="140" y="35" fontSize="20" fill="#dc2626">★</text>
+                            <text x="40" y="145" fontSize="20" fill="#dc2626">★</text>
+                            <text x="140" y="145" fontSize="20" fill="#dc2626">★</text>
                             <path
-                              d="M 70 100 L 90 120 L 135 70"
+                              d="M 70 95 L 85 110 L 115 75"
                               stroke="#dc2626"
-                              strokeWidth="8"
+                              strokeWidth="6"
                               fill="none"
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
-
-                            {/* Text paths */}
-                            <defs>
-                              <path
-                                id="topCurve"
-                                d="M 30,100 A 70,70 0 0,1 170,100"
-                                fill="none"
-                              />
-                              <path
-                                id="bottomCurve"
-                                d="M 170,100 A 70,70 0 0,1 30,100"
-                                fill="none"
-                              />
-                            </defs>
-                            
                             <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
-                              <textPath href="#topCurve" startOffset="50%" textAnchor="middle">
+                              <textPath href="#topCurve1" startOffset="50%" textAnchor="middle">
                                 MISSION
                               </textPath>
                             </text>
-                            
                             <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
-                              <textPath href="#bottomCurve" startOffset="50%" textAnchor="middle">
+                              <textPath href="#bottomCurve1" startOffset="50%" textAnchor="middle">
                                 COMPLETE
                               </textPath>
                             </text>
@@ -1722,11 +1664,12 @@ export default function TransactionJourney() {
                             onClick={() => {
                               setStep3ShowStamp(true)
                               setTimeout(() => {
+                                setStep3ShowStamp(false)
                                 setStep3Completed(true)
                                 setTimeout(() => {
                                   setCurrentStep(4)
                                 }, 500)
-                              }, 1500)
+                              }, 1000)
                             }}
                             className={`px-4 py-1 rounded-lg font-medium text-xs transition-all ${
                               isDark
@@ -1784,15 +1727,151 @@ export default function TransactionJourney() {
                 </div>
               )}
 
-              {/* Placeholder for other steps */}
-              {step.id !== 1 && step.id !== 2 && step.id !== 3 && (
-                <div className={`border rounded-none p-12 text-center ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
-                  <p className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                    Interactive Experience - Step {step.id}
-                  </p>
-                  <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                    Placeholder for interactive UI component
-                  </p>
+              {/* Step 4: Quorum Store Propagation */}
+              {step.id === 4 && (
+                <div className="relative">
+                  <QuorumStorePropagation
+                    key={currentStep}
+                    isDark={isDark}
+                    language={language}
+                    onShowStamp={() => setStep4ShowStamp(true)}
+                    onComplete={() => {
+                      setTimeout(() => {
+                        setCurrentStep(5)
+                      }, 1000)
+                    }}
+                  />
+
+                  {/* Step 4 Completion Stamp */}
+                  {step4ShowStamp && (
+                    <div className={`absolute inset-0 flex items-center justify-center pointer-events-none rounded-lg border-2 ${isDark ? "border-gray-600 bg-gray-900/80" : "border-gray-300 bg-white/80"}`}>
+                      <div className="stamp-animation">
+                        <svg width="140" height="140" viewBox="0 0 180 180">
+                          <defs>
+                            <filter id="dropShadow4">
+                              <feDropShadow dx="2" dy="2" stdDeviation="3" floodOpacity="0.3" />
+                            </filter>
+                            <path id="topCurve4" d="M 30 90 A 60 60 0 0 1 150 90" fill="none" />
+                            <path id="bottomCurve4" d="M 150 90 A 60 60 0 0 1 30 90" fill="none" />
+                          </defs>
+                          <circle cx="90" cy="90" r="85" fill="none" stroke="#dc2626" strokeWidth="3" filter="url(#dropShadow4)" opacity="0.9" />
+                          <circle cx="90" cy="90" r="75" fill="none" stroke="#dc2626" strokeWidth="2" opacity="0.7" />
+                          <text x="40" y="35" fontSize="20" fill="#dc2626">★</text>
+                          <text x="140" y="35" fontSize="20" fill="#dc2626">★</text>
+                          <text x="40" y="145" fontSize="20" fill="#dc2626">★</text>
+                          <text x="140" y="145" fontSize="20" fill="#dc2626">★</text>
+                          <path
+                            d="M 70 95 L 85 110 L 115 75"
+                            stroke="#dc2626"
+                            strokeWidth="6"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                            <textPath href="#topCurve4" startOffset="50%" textAnchor="middle">
+                              MISSION
+                            </textPath>
+                          </text>
+                          <text fontSize="14" fontWeight="bold" fill="#dc2626" letterSpacing="2">
+                            <textPath href="#bottomCurve4" startOffset="50%" textAnchor="middle">
+                              COMPLETE
+                            </textPath>
+                          </text>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 5: Consensus - AptosBFT */}
+              {step.id === 5 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className="max-w-2xl mx-auto text-center">
+                    <h3 className={`text-2xl font-bold mb-4 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                      {language === "ko" ? "합의 - AptosBFT" : "Consensus - AptosBFT"}
+                    </h3>
+                    <p className={`text-lg mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      {language === "ko" ? "배치 메타데이터의 순서에 대해 합의 중..." : "Reaching consensus on batch metadata ordering..."}
+                    </p>
+                    <div className={`p-8 rounded-lg border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                      <div className="text-6xl mb-4">🔄</div>
+                      <p className={`text-sm mb-4 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                        {language === "ko" ? "Step 5 구현 중" : "Step 5 Coming Soon"}
+                      </p>
+                      <button
+                        onClick={() => setCurrentStep(6)}
+                        className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                          isDark
+                            ? "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                            : "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                        }`}
+                      >
+                        {language === "ko" ? "다음 단계로" : "Next Step"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 6: Execution - BlockSTM */}
+              {step.id === 6 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className="max-w-2xl mx-auto text-center">
+                    <h3 className={`text-2xl font-bold mb-4 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                      {language === "ko" ? "실행 - BlockSTM" : "Execution - BlockSTM"}
+                    </h3>
+                    <p className={`text-lg mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      {language === "ko" ? "트랜잭션을 병렬로 안전하게 실행 중..." : "Executing transactions in parallel..."}
+                    </p>
+                    <div className={`p-8 rounded-lg border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                      <div className="text-6xl mb-4">⚡</div>
+                      <p className={`text-sm mb-4 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                        {language === "ko" ? "Step 6 구현 중" : "Step 6 Coming Soon"}
+                      </p>
+                      <button
+                        onClick={() => setCurrentStep(7)}
+                        className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                          isDark
+                            ? "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                            : "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                        }`}
+                      >
+                        {language === "ko" ? "다음 단계로" : "Next Step"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 7: Storage & Commit */}
+              {step.id === 7 && (
+                <div className={`border rounded-none p-8 ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
+                  <div className="max-w-2xl mx-auto text-center">
+                    <h3 className={`text-2xl font-bold mb-4 ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                      {language === "ko" ? "스토리지 커밋" : "Storage & Commit"}
+                    </h3>
+                    <p className={`text-lg mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      {language === "ko" ? "결과를 Ledger에 영구적으로 기록 중..." : "Recording results to Ledger..."}
+                    </p>
+                    <div className={`p-8 rounded-lg border-2 ${isDark ? "border-gray-600 bg-gray-900" : "border-gray-300 bg-white"}`}>
+                      <div className="text-6xl mb-4">💾</div>
+                      <p className={`text-sm mb-4 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                        {language === "ko" ? "Step 7 구현 중" : "Step 7 Coming Soon"}
+                      </p>
+                      <button
+                        onClick={() => setCurrentStep(1)}
+                        className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                          isDark
+                            ? "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                            : "bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white"
+                        }`}
+                      >
+                        {language === "ko" ? "처음부터 시작" : "Start Over"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </section>
