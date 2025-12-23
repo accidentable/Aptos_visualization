@@ -366,14 +366,14 @@ export default function TransactionJourney() {
     },
     {
       id: 4,
-      titleKo: "쿼럼스토어 - 데이터 전파",
-      titleEn: "Quorum Store - Data Propagation",
-      descriptionKo: "트랜잭션을 배치로 묶어 다른 밸리데이터에 전파하고 가용성증명을 생성합니다",
-      descriptionEn: "Transactions batched and propagated to validators with Proof of Availability",
-      categoryKo: "데이터 처리",
-      categoryEn: "Data Processing",
-      detailsKo: "앱토스는 합의 효율을 높이기 위하여 트랜잭션 데이터 전파와 순서 합의를 분리합니다. 트랜잭션을 배치 단위로 묶어 다른 밸리데이터에게 미리 전파하고, 데이터가 검증되었음을 증명하는 가용성증명(Proof of Availability)을 생성합니다. 2/3 이상의 밸리데이터로부터 PoA를 획득합니다.",
-      detailsEn: "Aptos separates transaction data propagation and order consensus for increased efficiency. Transactions are batched and pre-propagated to other validators, with a Proof of Availability generated to certify data validation. PoA is obtained from 2/3+ of validators."
+      titleKo: "쿼럼스토어 - 배치 전파",
+      titleEn: "Quorum Store - Batch Propagation",
+      descriptionKo: "생성된 배치를 다른 밸리데이터에 전파하고 가용성증명을 생성합니다",
+      descriptionEn: "Propagate created batches to validators and generate Proof of Availability",
+      categoryKo: "데이터 전파",
+      categoryEn: "Data Propagation",
+      detailsKo: "앱토스는 합의 효율을 높이기 위하여 트랜잭션 데이터 전파와 순서 합의를 분리합니다. Step 3에서 생성된 배치들을 다른 밸리데이터에게 전파하고, 데이터가 검증되었음을 증명하는 가용성증명(Proof of Availability)을 생성합니다. 2/3 이상의 밸리데이터로부터 PoA를 획득하면 데이터의 안정성이 보장됩니다.",
+      detailsEn: "Aptos separates transaction data propagation and order consensus for increased efficiency. Batches created in Step 3 are propagated to other validators, with a Proof of Availability generated to certify data validation. PoA obtained from 2/3+ of validators ensures data stability."
     },
     {
       id: 5,
@@ -1548,7 +1548,7 @@ export default function TransactionJourney() {
                       </div>
 
                       {/* Selectable TXs in Pool */}
-                      <div className="flex flex-wrap gap-2 justify-center">
+                      <div className="flex flex-wrap gap-2 justify-center items-center">
                         {step3TransactionsInPool.map((tx) => {
                           const isSelected = step3SelectedTxForBatch.includes(tx.id)
                           const boxSize = 12 + (tx.fee / 100) * 50
@@ -1579,7 +1579,7 @@ export default function TransactionJourney() {
                                   ease: "easeInOut",
                                   delay: Math.random() * 0.5
                                 }}
-                                className={`rounded-none flex items-center justify-center font-bold cursor-pointer transition-all ${
+                                className={`rounded-none flex items-center justify-center font-medium cursor-pointer transition-all ${
                                   isSelected
                                     ? isDark
                                       ? "bg-teal-400 text-gray-900 shadow-lg shadow-teal-400/80"
@@ -1596,11 +1596,6 @@ export default function TransactionJourney() {
                               >
                                 TX
                               </motion.div>
-
-                              {/* Fee Display */}
-                              <p className={`text-xs font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                                {tx.fee}APT
-                              </p>
                             </motion.div>
                           )
                         })}
@@ -1614,7 +1609,7 @@ export default function TransactionJourney() {
                       </p>
                       {step3SelectedTxForBatch.length > 0 && (
                         <p className={`text-xs font-bold mb-1 ${isDark ? "text-green-400" : "text-green-600"}`}>
-                          {language === "ko" ? "총 수수료: " : "Total Fee: "}
+                          {language === "ko" ? "총 수수료 수익: " : "Total Fee Revenue: "}
                           {step3TransactionsInPool
                             .filter(tx => step3SelectedTxForBatch.includes(tx.id))
                             .reduce((sum, tx) => sum + tx.fee, 0)}
