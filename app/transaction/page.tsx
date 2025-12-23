@@ -1663,13 +1663,10 @@ export default function TransactionJourney() {
                           <button
                             onClick={() => {
                               setStep3ShowStamp(true)
+                              setStep3Completed(true)
                               setTimeout(() => {
-                                setStep3ShowStamp(false)
-                                setStep3Completed(true)
-                                setTimeout(() => {
-                                  setCurrentStep(4)
-                                }, 500)
-                              }, 1000)
+                                setCurrentStep(4)
+                              }, 2000)
                             }}
                             className={`px-4 py-1 rounded-lg font-medium text-xs transition-all ${
                               isDark
